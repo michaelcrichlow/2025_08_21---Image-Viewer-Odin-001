@@ -91,12 +91,15 @@ main :: proc() {
     print("Odin took:", elapsed)
 
     SCREENWIDTH  : i32 = 800
-    SCREENHEIGHT : i32 = 1000
+    SCREENHEIGHT : i32 = 800
 
     rl.SetConfigFlags({.WINDOW_RESIZABLE, .WINDOW_MAXIMIZED})
 
     rl.InitWindow(SCREENWIDTH, SCREENHEIGHT, "Image Viewer")
     rl.SetTargetFPS(60)
+
+    // maximize the window
+    rl.MaximizeWindow()
 
     // loading the files
     files, names := get_png_files_and_names("assets/")
@@ -220,7 +223,13 @@ main :: proc() {
             screen_w := f32(rl.GetScreenWidth())
             screen_h := f32(rl.GetScreenHeight())
 
-            scale = shrink_to_fit(img_w, img_h, screen_w, screen_h)
+            // either `shink_to_fit()` if image is larger than screen, `expand_to_fit()` if image is smaller
+            if img_w > screen_w || img_h > screen_h {
+                scale = shrink_to_fit(img_w, img_h, screen_w, screen_h) // original!
+            } else if img_w < screen_w || img_h < screen_h {
+                scale = expand_to_fit(img_w, img_h, screen_w, screen_h)
+            }
+            
             offset = rl.Vector2{0, 0}
             
             title := format_title(
@@ -318,6 +327,52 @@ main :: proc() {
 
         offset.x = clamp(offset.x, -max_offset_x, max_offset_x)
         offset.y = clamp(offset.y, -max_offset_y, max_offset_y)
+
+
+        // 'Alt + Enter' to maximize and restore windows
+        if rl.IsKeyDown(.LEFT_ALT) || rl.IsKeyDown(.RIGHT_ALT) {
+            if rl.IsKeyPressed(.ENTER) {
+                if (rl.IsWindowState({.WINDOW_MAXIMIZED})) {
+                    rl.RestoreWindow()
+                } else {
+                    rl.MaximizeWindow()
+                }
+            }
+        }
+
+        // 'z + up arrow and down arrow' for quick zooming
+        if rl.IsKeyDown(.Z) && rl.IsKeyPressed(.UP) {
+            if scale + 1.0 <= 5.0 {
+                scale = scale + 1.0
+            } else {
+                scale = 5.0
+            }
+
+            title := format_title(
+                &title_buffer,
+                names[current],
+                current + 1,
+                len(names),
+                int(scale * 100),
+            )
+            rl.SetWindowTitle(title)
+            
+        } else if rl.IsKeyDown(.Z) && rl.IsKeyPressed(.DOWN) {
+            if scale - 1.0 >= 0.1 {
+                scale = scale - 1.0
+            } else {
+                scale = 0.1
+            }
+
+            title := format_title(
+                &title_buffer,
+                names[current],
+                current + 1,
+                len(names),
+                int(scale * 100),
+            )
+            rl.SetWindowTitle(title)
+        }
         // ---------------------------------------------------------------------------------------------------------
 
         // ---------------------------------------------------------------------------------------------------------
@@ -349,7 +404,7 @@ main :: proc() {
         // tooltip
         tooltip_text : cstring = ""
         if show_tooltip {
-            tooltip_text = "Left Arrow/Right Arrow to change image | Mouse wheel to zoom | Ctrl+Alt+0 for full size | Ctrl+0 to fit | T to toggle tooltip"
+            tooltip_text = "Left Arrow/Right Arrow to change image | Mouse wheel to zoom | Ctrl+Alt+0 for original size | Ctrl+0 to fit screen | T to toggle tooltip | Alt+Enter to toggle maximized | Z + Up/Down"
         } else {
             tooltip_text = "T to toggle tooltip"
         }
@@ -370,7 +425,7 @@ main :: proc() {
         rl.DrawText(tooltip_text, 10, i32(screen_h - 25), 20, rl.WHITE)
 
         // draw FPS last
-        rl.DrawText(rl.TextFormat("FPS: %d", rl.GetFPS()), 25, 25, 20, rl.BLACK)
+        // rl.DrawText(rl.TextFormat("FPS: %d", rl.GetFPS()), 25, 25, 20, rl.BLACK)
         
         rl.EndDrawing()
     }
@@ -407,6 +462,7 @@ get_png_files_and_names :: proc(dir: string) -> ([]string, []string) {
     for entry in entries {
         if entry.is_dir == false {
             if p_str.endswith(entry.name, ".png")  || 
+               p_str.endswith(entry.name, ".PNG")  || 
                p_str.endswith(entry.name, ".jpg")  || 
                p_str.endswith(entry.name, ".jpeg") {
                 append(&images, entry.fullpath)
@@ -427,6 +483,14 @@ shrink_to_fit :: proc(img_w, img_h, screen_w, screen_h: f32) -> f32 {
     return 1.0
 }
 
+expand_to_fit :: proc(img_w, img_h, screen_w, screen_h: f32) -> f32 {
+    if img_w < screen_w || img_h < screen_h {
+        scale_w := screen_w / img_w
+        scale_h := screen_h / img_h
+        return min(scale_w, scale_h)
+    }
+    return 1.0
+}
 
 format_title :: proc(buffer: ^[256]u8, name: string, index: int, total: int, zoom: int) -> cstring {
     // clear buffer
