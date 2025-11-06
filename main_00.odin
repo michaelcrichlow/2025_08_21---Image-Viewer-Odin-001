@@ -17,6 +17,10 @@ import p_list "python_list_functions"
 import p_int "python_int_functions"
 import p_float "python_float_functions"
 import p_heap "python_heap_functions"
+// ----------------------------------------------------------------------------------
+import "core:path/filepath"
+import "base:runtime"
+// ----------------------------------------------------------------------------------
 print :: fmt.println
 printf :: fmt.printf
 
@@ -86,6 +90,7 @@ main :: proc() {
     start: time.Time = time.now()
 
     // code goes here
+    // os.args[1]
 
     elapsed: time.Duration = time.since(start)
     print("Odin took:", elapsed)
@@ -102,8 +107,62 @@ main :: proc() {
     rl.MaximizeWindow()
 
     // loading the files
-    files, names := get_png_files_and_names("assets/")
+    // ----------------------------------------------------------------------------------
+    // NEW LOGIC to load files
+
+    // This will hold all images in the directory
+    files: []string
+    // This will hold just the names
+    names: []string
+    // This is the index of the image we want to show first
     current := 0
+
+    // 1. Check if a file path was given as an argument
+    if len(os.args) > 1 {
+        // --- A file was provided (e.g., "Open with...") ---
+        
+        // 2. Get the path from the argument
+        target_filepath := os.args[1]
+        
+        // 3. Get the directory *containing* that file
+        //    filepath.dir("C:/images/cat.png") -> "C:/images"
+        target_dir := filepath.dir(target_filepath)
+        defer delete(target_dir)
+
+        // 4. Scan that directory for all images
+        files, names = get_png_files_and_names(target_dir)
+        
+        // 5. Find the index of the file we're supposed to open
+        for file_path, i in files {
+            // Note: os.args[1] and entry.fullpath should be comparable.
+            // You may need to normalize paths if you find issues.
+            if file_path == target_filepath {
+                current = i
+                break // Found it!
+            }
+        }
+
+    } else {
+        // --- No file provided (e.g., just double-clicking the .exe) ---
+        
+        // Fall back to your original behavior
+        fmt.println("No file specified, loading from 'assets/'...")
+        files, names = get_png_files_and_names("assets/")
+        current = 0
+    }
+
+    // 6. Check if we actually found any images
+    if len(files) == 0 {
+        fmt.eprintln("Error: No images found.")
+        return
+    }
+    // ----------------------------------------------------------------------------------
+
+    // ORIGINAL LOGIC to load files
+    // files, names := get_png_files_and_names("assets/")
+    // current := 0
+
+    // "C:\Users\mikec\Desktop\shirt_design_03.png"
 
     // texture and scale ------------------------------------------------------
     texture := load_png(files[current])
@@ -461,13 +520,26 @@ get_png_files_and_names :: proc(dir: string) -> ([]string, []string) {
 
     for entry in entries {
         if entry.is_dir == false {
-            if p_str.endswith(entry.name, ".png")  || 
-               p_str.endswith(entry.name, ".PNG")  || 
-               p_str.endswith(entry.name, ".jpg")  || 
-               p_str.endswith(entry.name, ".jpeg") {
-                append(&images, entry.fullpath)
-                append(&names, entry.name)
-            }
+            // if p_str.endswith(entry.name, ".png")  || 
+            //    p_str.endswith(entry.name, ".PNG")  || 
+            //    p_str.endswith(entry.name, ".jpg")  || 
+            //    p_str.endswith(entry.name, ".jpeg") {
+            //     append(&images, entry.fullpath)
+            //     append(&names, entry.name)
+            // }
+            if p_str.endswith(entry.name, ".png")   || 
+                p_str.endswith(entry.name, ".PNG")  || 
+                p_str.endswith(entry.name, ".jpg")  || 
+                p_str.endswith(entry.name, ".jpeg") || 
+                p_str.endswith(entry.name, ".bmp")  || 
+                p_str.endswith(entry.name, ".tga")  || 
+                p_str.endswith(entry.name, ".gif")  || 
+                p_str.endswith(entry.name, ".hdr")  || 
+                p_str.endswith(entry.name, ".pic") {
+                    append(&images, entry.fullpath)
+                    append(&names, entry.name)
+                }
+
         }
     }
 
@@ -509,7 +581,7 @@ format_title :: proc(buffer: ^[256]u8, name: string, index: int, total: int, zoo
         total,
         zoom,
     )
-
     // change to cstring and return it
     return cstring(raw_data(val))
 }
+
