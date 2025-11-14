@@ -208,59 +208,66 @@ main :: proc() {
 
     // ---------------------------------------------------------------------------------------------------------
     // tooltip
-    show_tooltip := true
+    show_tooltip := false
     // ---------------------------------------------------------------------------------------------------------
 
     for !rl.WindowShouldClose() {
         
         // **GET INPUT** ------------------------------------------------------
-        // pressing right
-        if rl.IsKeyPressed(.RIGHT) {
-            current = (current + 1) % len(files)
-            rl.UnloadTexture(texture)
-            texture = load_png(files[current])
-            
-            img_w := f32(texture.width)
-            img_h := f32(texture.height)
-            screen_w := f32(rl.GetScreenWidth())
-            screen_h := f32(rl.GetScreenHeight())
+        
+        // pressing right to go to next image
+        if !rl.IsKeyDown(.LEFT_CONTROL) && !rl.IsKeyDown(.RIGHT_CONTROL) {
+            if rl.IsKeyPressed(.RIGHT) {
+                current = (current + 1) % len(files)
+                rl.UnloadTexture(texture)
+                texture = load_png(files[current])
+                
+                img_w := f32(texture.width)
+                img_h := f32(texture.height)
+                screen_w := f32(rl.GetScreenWidth())
+                screen_h := f32(rl.GetScreenHeight())
 
-            scale = shrink_to_fit(img_w, img_h, screen_w, screen_h)
-            offset = rl.Vector2{0, 0}
+                scale = shrink_to_fit(img_w, img_h, screen_w, screen_h)
+                offset = rl.Vector2{0, 0}
 
-            title := format_title(
-                &title_buffer,
-                names[current],
-                current + 1,
-                len(names),
-                int(scale * 100),
-            )
-            rl.SetWindowTitle(title)
+                title := format_title(
+                    &title_buffer,
+                    names[current],
+                    current + 1,
+                    len(names),
+                    int(scale * 100),
+                )
+                rl.SetWindowTitle(title)
+            }
         }
 
-        // pressing left
-        if rl.IsKeyPressed(.LEFT) {
-            current = (current - 1 + len(files)) % len(files)
-            rl.UnloadTexture(texture)
-            texture = load_png(files[current])
 
-            img_w := f32(texture.width)
-            img_h := f32(texture.height)
-            screen_w := f32(rl.GetScreenWidth())
-            screen_h := f32(rl.GetScreenHeight())
+        // pressing left to go to previous image
+        if !rl.IsKeyDown(.LEFT_CONTROL) && !rl.IsKeyDown(.RIGHT_CONTROL) {
+            if rl.IsKeyPressed(.LEFT) {
+                current = (current - 1 + len(files)) % len(files)
+                rl.UnloadTexture(texture)
+                texture = load_png(files[current])
 
-            scale = shrink_to_fit(img_w, img_h, screen_w, screen_h)
-            offset = rl.Vector2{0, 0}
+                img_w := f32(texture.width)
+                img_h := f32(texture.height)
+                screen_w := f32(rl.GetScreenWidth())
+                screen_h := f32(rl.GetScreenHeight())
 
-            title := format_title(
-                &title_buffer,
-                names[current],
-                current + 1,
-                len(names),
-                int(scale * 100),
-            )
-            rl.SetWindowTitle(title)
+                scale = shrink_to_fit(img_w, img_h, screen_w, screen_h)
+                offset = rl.Vector2{0, 0}
+
+                title := format_title(
+                    &title_buffer,
+                    names[current],
+                    current + 1,
+                    len(names),
+                    int(scale * 100),
+                )
+                rl.SetWindowTitle(title)
+            }
         }
+
 
         // snapping size to 'full size' or 'shink to fit'
         if rl.IsKeyDown(.LEFT_CONTROL) && rl.IsKeyDown(.LEFT_ALT) && rl.IsKeyPressed(.KP_0) {
@@ -380,6 +387,45 @@ main :: proc() {
             }
         }
 
+        // ----------------------------------------------------------------------------------
+        // Handle keyboard arrow scrolling
+        scroll_speed : f32 = 10.0 // adjust to taste
+
+        if rl.IsKeyDown(.LEFT_CONTROL) || rl.IsKeyDown(.RIGHT_CONTROL) {
+            if rl.IsKeyDown(.UP) {
+                offset.y += scroll_speed
+            }
+            if rl.IsKeyDown(.DOWN) {
+                offset.y -= scroll_speed
+            }
+            if rl.IsKeyDown(.LEFT) {
+                offset.x += scroll_speed
+            }
+            if rl.IsKeyDown(.RIGHT) {
+                offset.x -= scroll_speed
+            }
+        }
+        
+
+        // Handle Ctrl + Home / Ctrl + End
+        if rl.IsKeyDown(.LEFT_CONTROL) || rl.IsKeyDown(.RIGHT_CONTROL) {
+            if rl.IsKeyPressed(.HOME) {
+                // Jump to top of image
+                // offset.y = img_h - screen_h // 0.0
+                offset.y = f32(INT_MAX)
+                offset.x = f32(INT_MAX)
+                // offset.x = img_w - screen_w // 0.0
+            }
+            if rl.IsKeyPressed(.END) {
+                // Jump to bottom of image
+                // offset.y = -(img_h - screen_h)
+                offset.y = - f32(INT_MAX)
+                offset.x = - f32(INT_MAX)
+                // offset.x = -(img_w - screen_w)
+            }
+        }
+        // ----------------------------------------------------------------------------------
+
         // clamp offset
         max_offset_x := max(0, (scaled_w - screen_w) / 2)
         max_offset_y := max(0, (scaled_h - screen_h) / 2)
@@ -463,7 +509,8 @@ main :: proc() {
         // tooltip
         tooltip_text : cstring = ""
         if show_tooltip {
-            tooltip_text = "Left Arrow/Right Arrow to change image | Mouse wheel to zoom | Ctrl+Alt+0 for original size | Ctrl+0 to fit screen | T to toggle tooltip | Alt+Enter to toggle maximized | Z + Up/Down"
+            //tooltip_text = "Left Arrow/Right Arrow to change image | Mouse wheel to zoom | Ctrl+Alt+0 for original size | Ctrl+0 to fit screen | T to toggle tooltip | Alt+Enter to toggle maximized \nZ + Up/Down to 'Jump Zoom' | Ctrl+ (Up/Down/Left/Right) to pan image | Ctrl + Home to jump to top of image | Ctrl + End to jump to bottom of image "
+            tooltip_text = "- T to toggle tooltip \n- Left Arrow/Right Arrow to change image \n- Mouse wheel to zoom \n- Ctrl+Alt+0 for original size \n- Ctrl+0 to fit screen \n- Alt+Enter to toggle maximized \n- Z + Up/Down to 'Jump Zoom' \n- Ctrl + Up/Down/Left/Right to pan image \n- Ctrl + Home to jump to top of image \n- Ctrl + End to jump to bottom of image"
         } else {
             tooltip_text = "T to toggle tooltip"
         }
@@ -477,14 +524,23 @@ main :: proc() {
 
         // tooltip at bottom
         if show_tooltip {
-            rl.DrawRectangle(0, i32(screen_h - 30), i32(screen_w), 30, rl.GRAY)
+            // rl.DrawRectangle(0, i32(screen_h - 60), i32(screen_w), 60, rl.GRAY) // original
+            rl.DrawRectangle(0, 0, 600, 260, rl.GRAY)
+            // rl.DrawText(tooltip_text, 10, i32(screen_h - 55), 20, rl.WHITE) // original
+            rl.DrawText(tooltip_text, 10, i32(screen_h - (screen_h - 10)), 20, rl.WHITE)
         } else {
             rl.DrawRectangle(0, i32(screen_h - 30), 220, 30, rl.GRAY)
+            rl.DrawText(tooltip_text, 10, i32(screen_h - 25), 20, rl.WHITE)
         }
-        rl.DrawText(tooltip_text, 10, i32(screen_h - 25), 20, rl.WHITE)
+        // rl.DrawText(tooltip_text, 10, i32(screen_h - 55), 20, rl.WHITE)
+        // rl.DrawText(tooltip_text, 10, i32(screen_h - 25), 20, rl.WHITE)
 
         // draw FPS last
         // rl.DrawText(rl.TextFormat("FPS: %d", rl.GetFPS()), 25, 25, 20, rl.BLACK)
+
+        // draw offset.y for debugging
+        // rl.DrawText(rl.TextFormat("offset.y: %.2f", offset.y), 25, 25, 20, rl.BLACK)
+
         
         rl.EndDrawing()
     }
@@ -584,4 +640,3 @@ format_title :: proc(buffer: ^[256]u8, name: string, index: int, total: int, zoo
     // change to cstring and return it
     return cstring(raw_data(val))
 }
-
